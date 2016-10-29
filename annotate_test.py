@@ -828,7 +828,7 @@ namedtuple(constructor[type|type|type]) - group, checks all positions
     )
 
 
-def _parse_func_args(args_temp, kwargs, kwargs_temp, sig):
+def _parse_func_args(args_temp, kwargs, kwargs_temp, sig, fname):
     """This returns an OrderedDict after filtering args_temp, kwargs
 (for values) and kwargs based on the signature of the function.
 This is required because kwargs can affect positional args, and *args
@@ -838,6 +838,7 @@ The dict format is:
 
 For the annotation testing, will use annotation and value
 """
+    err = "Exception from module ### {} ###\n".format(fname)
     # To make this a function, needs args, kwargs and sig
     odict = OrderedDict()
     # Create OrderedDict with key = arg name
@@ -878,7 +879,8 @@ For the annotation testing, will use annotation and value
 
     # Test for leftover positional and leave list of values if True
     if len(args_temp) != 0 and order_var_arg == '':
-        raise ValueError("Too many args. {} extra".format(len(args_temp)))
+        raise ValueError(err +
+                         "Too many args. {} extra argument".format(len(args_temp)))
     if len(args_temp) != 0:
         odict[order_var_arg][3] = args_temp
         odict[order_var_arg][2] = "default=no"
@@ -886,7 +888,8 @@ For the annotation testing, will use annotation and value
     # Run through keywords
     for i in order_keyword:
         if odict[i][2] == 'default=no':
-            raise ValueError("{} already has value".format(i))
+            raise ValueError(err +
+                             "{} already has value".format(i))
         else:
             if kwargs_temp.get(i) is not None:
                 odict[i][3] = kwargs[i]
@@ -901,7 +904,8 @@ For the annotation testing, will use annotation and value
         for i in kwargs_temp:
             if odict.get(i) is not None:
                 if odict[i][2] == "default=no":
-                    raise ValueError("{} already exists".format(i))
+                    raise ValueError(err +
+                                     "{} already exists".format(i))
                 else:
                     odict[i][2] = "default=no"
                     odict[i][3] = kwargs_temp[i]
@@ -916,8 +920,8 @@ For the annotation testing, will use annotation and value
                     "{} variable doesn't exist".format(kwargs_temp))
             else:
                 if odict[i][2] == "default=no":
-                    raise ValueError(
-                        "{} variable is already assigned!".format(kwargs_temp))
+                    raise ValueError(err +
+                                     "{} variable is already assigned!".format(kwargs_temp))
                 else:
                     odict[i][2] = "default=no"
                     odict[i][3] = kwargs_temp[i]
@@ -948,7 +952,9 @@ def annotate_test(func):
         sig = signature(func)
 
         # Break down into Position and Keyword arguments into an OrderedDict
-        order = _parse_func_args(args_temp, kwargs, kwargs_temp, sig)
+        order = _parse_func_args(args_temp, kwargs,
+                                 kwargs_temp, sig,
+                                 func.__module__ + ' ' + func.__repr__())
 
         # Test
         for i in order:
@@ -957,8 +963,8 @@ def annotate_test(func):
 
         try:
             func_return = func(*args, **kwargs)
-        except:
-            print("No joy")
+        except Exception as ex:
+            raise ex
 
         # Test return value to annotation
         if sig.return_annotation != sig.empty:
